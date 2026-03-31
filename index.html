@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Istoglas — Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0ede8;
+    --border: rgba(0,0,0,0.09);
+    --border2: rgba(0,0,0,0.15);
+    --text: #1a1a18;
+    --text2: #5f5e5a;
+    --text3: #9a9993;
+    --blue: #378ADD;
+    --blue-light: #E6F1FB;
+    --blue-dark: #185FA5;
+    --green: #1D9E75;
+    --green-light: #EAF3DE;
+    --green-dark: #3B6D11;
+    --amber: #EF9F27;
+    --amber-light: #FAEEDA;
+    --amber-dark: #854F0B;
+    --red: #E24B4A;
+    --red-light: #FCEBEB;
+    --red-dark: #A32D2D;
+    --purple: #7F77DD;
+    --purple-light: #EEEDFE;
+    --purple-dark: #3C3489;
+    --coral: #D85A30;
+    --coral-light: #FAECE7;
+    --teal: #1D9E75;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #252523;
+      --surface2: #2e2e2b;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #f0ede8;
+      --text2: #b4b2a9;
+      --text3: #6e6d68;
+      --blue-light: #0c447c;
+      --blue-dark: #85b7eb;
+      --green-light: #085041;
+      --green-dark: #9fe1cb;
+      --amber-light: #633806;
+      --amber-dark: #fac775;
+      --red-light: #501313;
+      --red-dark: #f09595;
+      --purple-light: #26215c;
+      --purple-dark: #afa9ec;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* LAYOUT */
+  .app { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+  }
+
+  .logo {
+    padding: 0 20px 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .logo-title { font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  .nav-section { padding: 0 12px; margin-bottom: 4px; }
+  .nav-label { font-size: 10px; font-weight: 500; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; padding: 0 8px; margin-bottom: 4px; margin-top: 12px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text2);
+    transition: background 0.15s, color 0.15s;
+    border: none; background: none; width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--blue-light); color: var(--blue-dark); font-weight: 500; }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+
+  .updated {
+    margin-top: auto;
+    padding: 16px 20px 0;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.6;
+  }
+
+  .main {
+    margin-left: 220px;
+    flex: 1;
+    padding: 28px 32px;
+    max-width: 1100px;
+  }
+
+  /* PAGE HEADER */
+  .page-header { margin-bottom: 24px; }
+  .page-title { font-size: 20px; font-weight: 600; color: var(--text); letter-spacing: -0.4px; }
+  .page-sub { font-size: 13px; color: var(--text2); margin-top: 3px; }
+
+  /* SECTIONS */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* METRIC CARDS */
+  .metrics { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); margin-bottom: 24px; }
+  .metrics-3 { grid-template-columns: repeat(3, 1fr); }
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .metric-label { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .metric-value { font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; line-height: 1; }
+  .metric-sub { font-size: 12px; color: var(--text3); margin-top: 6px; }
+  .metric-delta { font-size: 12px; font-weight: 500; margin-top: 6px; }
+  .delta-up { color: var(--green-dark); }
+  .delta-down { color: var(--red-dark); }
+  .delta-neutral { color: var(--text3); }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+  }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
+  .card-subtitle { font-size: 11px; color: var(--text3); font-weight: 400; margin-left: 6px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* CHART WRAPPER */
+  .chart-box { position: relative; }
+
+  /* LEGEND */
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  /* TABLE */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th {
+    text-align: left; padding: 8px 10px;
+    font-size: 10px; font-weight: 500; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .data-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--surface2); }
+  .data-table td:first-child { color: var(--text); font-weight: 400; }
+  .td-right { text-align: right; }
+  .td-center { text-align: center; }
+
+  /* BADGES */
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 500;
+    padding: 2px 7px; border-radius: 20px; white-space: nowrap;
+  }
+  .badge-short { background: var(--blue-light); color: var(--blue-dark); }
+  .badge-long { background: var(--purple-light); color: var(--purple-dark); }
+  .badge-green { background: var(--green-light); color: var(--green-dark); }
+  .badge-amber { background: var(--amber-light); color: var(--amber-dark); }
+  .badge-red { background: var(--red-light); color: var(--red-dark); }
+  .badge-blue { background: var(--blue-light); color: var(--blue-dark); }
+
+  /* PROGRESS BARS */
+  .progress-list { display: flex; flex-direction: column; gap: 10px; }
+  .progress-row { display: flex; align-items: center; gap: 10px; }
+  .progress-name { font-size: 12px; color: var(--text); min-width: 140px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+  .progress-track { flex: 1; background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; }
+  .progress-val { font-size: 12px; font-weight: 500; color: var(--text); min-width: 50px; text-align: right; flex-shrink: 0; }
+
+  /* INSIGHT BOXES */
+  .insight {
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border-left: 3px solid;
+  }
+  .insight-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .insight-body { font-size: 12px; line-height: 1.6; }
+  .insight-info { border-color: var(--blue); background: var(--blue-light); }
+  .insight-info .insight-title { color: var(--blue-dark); }
+  .insight-info .insight-body { color: var(--blue-dark); opacity: 0.85; }
+  .insight-warn { border-color: var(--amber); background: var(--amber-light); }
+  .insight-warn .insight-title { color: var(--amber-dark); }
+  .insight-warn .insight-body { color: var(--amber-dark); opacity: 0.85; }
+  .insight-danger { border-color: var(--red); background: var(--red-light); }
+  .insight-danger .insight-title { color: var(--red-dark); }
+  .insight-danger .insight-body { color: var(--red-dark); opacity: 0.85; }
+  .insight-success { border-color: var(--green); background: var(--green-light); }
+  .insight-success .insight-title { color: var(--green-dark); }
+  .insight-success .insight-body { color: var(--green-dark); opacity: 0.85; }
+
+  /* SECTION TITLE */
+  .section-label { font-size: 10px; font-weight: 500; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; margin-top: 4px; }
+
+  /* YPP PROGRESS */
+  .ypp-bar { margin: 8px 0 4px; height: 12px; background: var(--surface2); border-radius: 6px; overflow: hidden; }
+  .ypp-fill { height: 100%; border-radius: 6px; }
+  .ypp-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); }
+
+  /* DIVIDER */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .sidebar { width: 60px; min-width: 60px; }
+    .nav-item span:not(.nav-icon) { display: none; }
+    .logo-title, .logo-sub, .nav-label, .updated { display: none; }
+    .main { margin-left: 60px; padding: 20px 16px; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .two-col, .three-col { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .metrics { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-title">Istoglas</div>
+    <div class="logo-sub">Analytics</div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Secțiuni</div>
+    <button class="nav-item active" onclick="showSection('overview')">
+      <span class="nav-icon">◉</span><span>Overview canal</span>
+    </button>
+    <button class="nav-item" onclick="showSection('last30')">
+      <span class="nav-icon">◷</span><span>Ultimele 30 zile</span>
+    </button>
+    <button class="nav-item" onclick="showSection('videos')">
+      <span class="nav-icon">▷</span><span>Videoclipuri</span>
+    </button>
+    <button class="nav-item" onclick="showSection('audience')">
+      <span class="nav-icon">◈</span><span>Audiență</span>
+    </button>
+    <button class="nav-item" onclick="showSection('traffic')">
+      <span class="nav-icon">⇢</span><span>Trafic</span>
+    </button>
+  </div>
+  <div class="updated">
+    Actualizat<br>
+    <strong id="updated-date">—</strong>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- ============ OVERVIEW ============ -->
+<div id="section-overview" class="section active">
+  <div class="page-header">
+    <div class="page-title">Overview canal</div>
+    <div class="page-sub" id="overview-range">—</div>
+  </div>
+
+  <div class="metrics" id="overview-metrics"></div>
+
+  <!-- YPP Progress -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-title">Progres spre monetizare YPP <span class="card-subtitle">4.000 ore watch time + 1.000 abonați</span></div>
+    <div class="section-label">Watch time acumulat</div>
+    <div class="ypp-bar"><div class="ypp-fill" id="ypp-wt-fill" style="background:var(--blue);"></div></div>
+    <div class="ypp-meta"><span id="ypp-wt-cur">—</span><span>4.000 ore necesare</span></div>
+    <div style="margin-top:14px;">
+      <div class="section-label">Abonați — date indisponibile în export</div>
+      <div class="insight insight-warn" style="margin-top:6px;margin-bottom:0;">
+        <div class="insight-body">Datele de abonați nu sunt incluse în exportul curent. Verifică în YouTube Studio → Audiență → Abonați totali.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Monthly Chart -->
+  <div class="card">
+    <div class="card-title">Vizualizări lunare</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue);"></div>Luni active</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--surface2);border:1px solid var(--border2);"></div>Luni slabe</div>
+    </div>
+    <div class="chart-box" style="height:220px;"><canvas id="monthlyChart"></canvas></div>
+  </div>
+
+  <!-- Insights -->
+  <div class="section-label" style="margin-top:4px;">Insights cheie</div>
+  <div class="insight insight-danger">
+    <div class="insight-title">Audiența reală ≠ audiența planificată</div>
+    <div class="insight-body">55%+ din vizionări provin de la persoane 45+ ani. Segmentul țintă 16–35 ani reprezintă sub 8%. Decide deliberat dacă ajustezi conținutul sau îmbrățișezi publicul real.</div>
+  </div>
+  <div class="insight insight-warn">
+    <div class="insight-title">Long-form aproape inexistent</div>
+    <div class="insight-body">5 videoclipuri long-form în un an. Watch time din long-form = ~72 ore din 478 ore totale. Fără long-form consistent, YPP rămâne departe.</div>
+  </div>
+  <div class="insight insight-success">
+    <div class="insight-title">Shorts — motorul canalului</div>
+    <div class="insight-body">62% din trafic vine din Shorts. Completion rate mediu 58,8%. Vlad Țepeș EP01: 93% completion — cel mai bun indicator de pe canal.</div>
+  </div>
+</div>
+
+<!-- ============ LAST 30 ============ -->
+<div id="section-last30" class="section">
+  <div class="page-header">
+    <div class="page-title">Ultimele 30 de zile</div>
+    <div class="page-sub" id="last30-range">—</div>
+  </div>
+
+  <div class="metrics metrics-3" id="last30-metrics"></div>
+
+  <div class="card">
+    <div class="card-title">Vizualizări zilnice</div>
+    <div class="chart-box" style="height:220px;"><canvas id="last30Chart"></canvas></div>
+  </div>
+
+  <div class="section-label">Analiză perioadă</div>
+  <div class="insight insight-success">
+    <div class="insight-title">Spike 25–27 martie — semnal pozitiv</div>
+    <div class="insight-body">Canalul a trecut de la ~50–80 vizualizări/zi la 2.132 într-o singură zi. Spike-ul sugerează că algoritmul a început să redistribuie conținut nou. Monitorizează dacă tendința se menține în săptămânile următoare.</div>
+  </div>
+  <div class="insight insight-warn">
+    <div class="insight-title">Prea devreme pentru concluzii solide</div>
+    <div class="insight-body">30 de zile post-reactivare după 6 luni de pauză nu sunt suficiente. YouTube are nevoie de 8–12 săptămâni de consistență pentru a recalibra distribuția organică. Nu schimba format sau ton până la 60 de zile de date.</div>
+  </div>
+  <div class="insight insight-info">
+    <div class="insight-title">Recomandare pentru următoarele 30–60 zile</div>
+    <div class="insight-body">1. Publică minim 3–4 Shorts/săptămână + 1 long-form/săptămână fără întrerupere. 2. Prioritizează Vlad Țepeș long-form — cel mai bun semnal pe canal. 3. Monitorizează dacă spike-ul aduce abonați noi sau e trafic de suprafață.</div>
+  </div>
+</div>
+
+<!-- ============ VIDEOS ============ -->
+<div id="section-videos" class="section">
+  <div class="page-header">
+    <div class="page-title">Videoclipuri</div>
+    <div class="page-sub">200 videoclipuri totale — 195 Shorts, 5 Long-form</div>
+  </div>
+
+  <!-- Shorts vs Long-form -->
+  <div class="two-col" style="margin-bottom:20px;">
+    <div class="card" style="margin-bottom:0;">
+      <div class="card-title"><span class="badge badge-short">Shorts</span> <span id="sh-count">—</span> videoclipuri</div>
+      <div class="metrics" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0;" id="sh-metrics"></div>
+    </div>
+    <div class="card" style="margin-bottom:0;">
+      <div class="card-title"><span class="badge badge-long">Long-form</span> <span id="lf-count">—</span> videoclipuri</div>
+      <div class="metrics" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0;" id="lf-metrics"></div>
+    </div>
+  </div>
+
+  <!-- Personalities chart -->
+  <div class="card">
+    <div class="card-title">Vizualizări pe personalitate</div>
+    <div class="chart-box" style="height:260px;"><canvas id="personalityChart"></canvas></div>
+  </div>
+
+  <!-- Top completion -->
+  <div class="card">
+    <div class="card-title">Top Shorts — Completion Rate <span class="card-subtitle">min. 200 vizualizări</span></div>
+    <div class="progress-list" id="completion-list"></div>
+  </div>
+
+  <!-- Top videos table -->
+  <div class="card">
+    <div class="card-title">Top 15 videoclipuri — Vizualizări</div>
+    <div style="overflow-x:auto;">
+      <table class="data-table" id="top-videos-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Titlu</th>
+            <th>Tip</th>
+            <th class="td-right">Vizualizări</th>
+            <th class="td-right">Completion</th>
+            <th class="td-right">Watch time</th>
+            <th class="td-right">Likes</th>
+          </tr>
+        </thead>
+        <tbody id="top-videos-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ============ AUDIENCE ============ -->
+<div id="section-audience" class="section">
+  <div class="page-header">
+    <div class="page-title">Audiență</div>
+    <div class="page-sub">Distribuție pe vârstă și gen</div>
+  </div>
+
+  <div class="two-col">
+    <div class="card" style="margin-bottom:0;">
+      <div class="card-title">Distribuție combinată (vârstă + gen)</div>
+      <div class="chart-box" style="height:280px;"><canvas id="audienceChart"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:0;">
+      <div class="card-title">Distribuție pe grupă de vârstă</div>
+      <div class="chart-box" style="height:280px;"><canvas id="ageChart"></canvas></div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;">
+    <div class="insight insight-danger">
+      <div class="insight-title">Gap major: audiența vizată vs audiența reală</div>
+      <div class="insight-body">Targetul Istoglas: 16–35 ani. Realitate: 45+ ani = 55,7% din audiență. 25–34 ani = 6,7% total. Aceasta nu e neapărat negativ — poate fi o nișă valoroasă neservită — dar necesită o decizie deliberată de strategie.</div>
+    </div>
+    <div class="insight insight-info">
+      <div class="insight-title">Audiența 45+ convertește bine?</div>
+      <div class="insight-body">Verifică dacă publicul 45+ generează mai multe like-uri, share-uri sau comentarii per vizualizare față de publicul tânăr. Dacă da, poate fi semnalul că Istoglas are un avantaj competitiv real în această nișă.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TRAFFIC ============ -->
+<div id="section-traffic" class="section">
+  <div class="page-header">
+    <div class="page-title">Surse de trafic</div>
+    <div class="page-sub">De unde vin vizualizările</div>
+  </div>
+
+  <div class="two-col">
+    <div class="card" style="margin-bottom:0;">
+      <div class="card-title">Distribuție vizualizări</div>
+      <div id="traffic-legend" class="legend"></div>
+      <div class="chart-box" style="height:220px;"><canvas id="trafficChart"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:0;">
+      <div class="card-title">Detaliu surse</div>
+      <div id="traffic-bars" class="progress-list"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;">
+    <div class="insight insight-warn">
+      <div class="insight-title">Trafic din abonați foarte scăzut (2%)</div>
+      <div class="insight-body">Abonații aduc doar 1.915 vizualizări din 107k totale. Înseamnă că fie numărul de abonați e mic, fie rata de notificare/click e redusă. Thumbnails și titluri optimizate pentru abonați existenți pot crește acest număr semnificativ.</div>
+    </div>
+    <div class="insight insight-success">
+      <div class="insight-title">Search organic — al doilea canal (18%)</div>
+      <div class="insight-body">19.312 vizualizări din căutare YouTube. Acesta este traficul cu cea mai bună retenție pe termen lung. Optimizează titluri și descrieri cu termeni de căutare relevanți pentru fiecare personalitate istorică.</div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+// ============ DATA ============
+const D = {
+  totals: {"views":101564,"watchtime":26848,"likes":1616,"comments":53,"shares":279,"date_from":"2025-03-30","date_to":"2026-03-28","days":364},
+  monthly: [{"Month":"2025-03","Views":1277,"Watch Time (min)":408,"Likes":32},{"Month":"2025-04","Views":28755,"Watch Time (min)":4554,"Likes":388},{"Month":"2025-05","Views":17343,"Watch Time (min)":3669,"Likes":200},{"Month":"2025-06","Views":28046,"Watch Time (min)":7540,"Likes":416},{"Month":"2025-07","Views":9727,"Watch Time (min)":4679,"Likes":203},{"Month":"2025-08","Views":2889,"Watch Time (min)":884,"Likes":20},{"Month":"2025-09","Views":574,"Watch Time (min)":308,"Likes":11},{"Month":"2025-10","Views":740,"Watch Time (min)":321,"Likes":19},{"Month":"2025-11","Views":762,"Watch Time (min)":259,"Likes":7},{"Month":"2025-12","Views":1826,"Watch Time (min)":604,"Likes":31},{"Month":"2026-01","Views":1808,"Watch Time (min)":600,"Likes":39},{"Month":"2026-02","Views":1790,"Watch Time (min)":723,"Likes":36},{"Month":"2026-03","Views":6027,"Watch Time (min)":2299,"Likes":214}],
+  last30: {"views":6124,"watchtime":2366,"likes":216,"date_from":"2026-02-27","date_to":"2026-03-28"},
+  prev30: {"views":1916,"watchtime":709,"likes":40},
+  personalities: [{"name":"Ilie Balaci","views":11567},{"name":"Grigorescu","views":10543},{"name":"Mița Biciclista","views":9875},{"name":"Ana Aslan","views":9354},{"name":"Vlad Țepeș","views":4470},{"name":"Mădălina Manole","views":1828},{"name":"Ștefan cel Mare","views":1774},{"name":"Henri Coandă","views":146}],
+  top_videos: [{"Title":"Mita Biciclista Ep.1: PRIMA FEMEIE pe bicicletă din București! 🚴","Type":"Short","Views":5857,"Watch Time (min)":2185,"Avg % Viewed":65.41,"Likes":104,"Comentarii":4},{"Title":"Vlad Țepeș | EP 01","Type":"Short","Views":2284,"Watch Time (min)":914,"Avg % Viewed":93.15,"Likes":97,"Comentarii":1},{"Title":"Ilie Balaci Ep.1: Mingea de CÂRPĂ și visul unui GENIU!","Type":"Short","Views":2173,"Watch Time (min)":542,"Avg % Viewed":46.16,"Likes":25,"Comentarii":0},{"Title":"Mădălina Manole: Vocea de aur a muzicii românești","Type":"Short","Views":1828,"Watch Time (min)":391,"Avg % Viewed":48.3,"Likes":32,"Comentarii":4},{"Title":"Ilie Balaci Ep.4: TRĂDAREA ce i-a ȘOCAT pe fani!","Type":"Short","Views":1775,"Watch Time (min)":550,"Avg % Viewed":52.37,"Likes":23,"Comentarii":0},{"Title":"Ștefan cel Mare: Eroul neînfricat al Moldovei medievale.","Type":"Short","Views":1774,"Watch Time (min)":418,"Avg % Viewed":51.38,"Likes":38,"Comentarii":4},{"Title":"Mita Biciclista Ep.6: LEGENDA unei epoci APUSE!","Type":"Short","Views":1711,"Watch Time (min)":592,"Avg % Viewed":59.39,"Likes":68,"Comentarii":0},{"Title":"Ilie Balaci Ep.6: NAȚIONALA și un GOL de ANTOLOGIE!","Type":"Short","Views":1598,"Watch Time (min)":248,"Avg % Viewed":44.83,"Likes":5,"Comentarii":0},{"Title":"Nicolae Grigorescu | EP 6 | Car cu boi","Type":"Short","Views":1576,"Watch Time (min)":209,"Avg % Viewed":44.87,"Likes":25,"Comentarii":0},{"Title":"Ilie Balaci Ep.7: ANTRENORUL Ilie: Pasiune și FOC!","Type":"Short","Views":1548,"Watch Time (min)":231,"Avg % Viewed":35.42,"Likes":22,"Comentarii":0},{"Title":"Nicolae Grigorescu | EP 4 | Întoarcerea acasă","Type":"Short","Views":1458,"Watch Time (min)":201,"Avg % Viewed":50.01,"Likes":24,"Comentarii":0},{"Title":"ION ANTONESCU: Adevărul șocant despre conducătorul României! | ISTOGLAS #001","Type":"Long-form","Views":1453,"Watch Time (min)":4321,"Avg % Viewed":38.54,"Likes":62,"Comentarii":15},{"Title":"Ana Aslan | EP 7 | Îndoieli, gelozii și lupta pentru adevăr","Type":"Short","Views":1443,"Watch Time (min)":207,"Avg % Viewed":42.72,"Likes":17,"Comentarii":0},{"Title":"Ana Aslan | EP 9 | Ultimii ani, între satisfacție și durere","Type":"Short","Views":1443,"Watch Time (min)":175,"Avg % Viewed":43.28,"Likes":20,"Comentarii":1},{"Title":"George Emil Palade | EP 8 | O viață de reflecții asupra științei","Type":"Short","Views":1416,"Watch Time (min)":178,"Avg % Viewed":44.51,"Likes":14,"Comentarii":0}],
+  top_completion: [{"Title":"Petre Țuțea: Filosoful și eseistul României","Views":296,"Avg % Viewed":152.82,"Likes":2},{"Title":"Constantin Brâncuși Ep.2: PE JOS până la Paris!","Views":753,"Avg % Viewed":111.82,"Likes":8},{"Title":"Vlad Țepeș | EP 03","Views":597,"Avg % Viewed":105.27,"Likes":32},{"Title":"Descoperiți viața lui Nicolae Ceaușescu!","Views":213,"Avg % Viewed":102.08,"Likes":2},{"Title":"Vlad Țepeș | EP 01","Views":2284,"Avg % Viewed":93.15,"Likes":97},{"Title":"Ana Aslan | EP 4 | Gerovital H3","Views":457,"Avg % Viewed":79.66,"Likes":8},{"Title":"Vlad Țepeș | EP 02","Views":1186,"Avg % Viewed":79.49,"Likes":42},{"Title":"Carmen Sylva: Regina-poetă a României","Views":214,"Avg % Viewed":71.62,"Likes":4},{"Title":"Ion Antonescu | EP 5 | Alianța cu Hitler","Views":225,"Avg % Viewed":71.49,"Likes":7},{"Title":"Constantin Brâncuși Ep.9: REFUZAT de România!","Views":801,"Avg % Viewed":67.79,"Likes":13}],
+  traffic: [{"Sursa Trafic":"SHORTS","Views":66891,"Watch Time (min)":13551},{"Sursa Trafic":"YT_SEARCH","Views":19312,"Watch Time (min)":5658},{"Sursa Trafic":"YT_CHANNEL","Views":9999,"Watch Time (min)":1906},{"Sursa Trafic":"SUBSCRIBER","Views":1915,"Watch Time (min)":2173},{"Sursa Trafic":"EXT_URL","Views":952,"Watch Time (min)":610},{"Sursa Trafic":"RELATED_VIDEO","Views":731,"Watch Time (min)":2289},{"Sursa Trafic":"YT_OTHER_PAGE","Views":509,"Watch Time (min)":186},{"Sursa Trafic":"HASHTAGS","Views":236,"Watch Time (min)":74},{"Sursa Trafic":"PLAYLIST","Views":194,"Watch Time (min)":114},{"Sursa Trafic":"NO_LINK_OTHER","Views":78,"Watch Time (min)":120},{"Sursa Trafic":"NOTIFICATION","Views":78,"Watch Time (min)":60},{"Sursa Trafic":"SOUND_PAGE","Views":26,"Watch Time (min)":5},{"Sursa Trafic":"SHORTS_CONTENT_LINKS","Views":13,"Watch Time (min)":31},{"Sursa Trafic":"END_SCREEN","Views":2,"Watch Time (min)":0}],
+  audience: [{"Grup Varsta":"age45-54","Gen":"female","% Vizualizari":17.6},{"Grup Varsta":"age55-64","Gen":"male","% Vizualizari":15.4},{"Grup Varsta":"age65-","Gen":"male","% Vizualizari":15.0},{"Grup Varsta":"age45-54","Gen":"male","% Vizualizari":12.6},{"Grup Varsta":"age65-","Gen":"female","% Vizualizari":12.5},{"Grup Varsta":"age35-44","Gen":"male","% Vizualizari":8.2},{"Grup Varsta":"age55-64","Gen":"female","% Vizualizari":7.2},{"Grup Varsta":"age25-34","Gen":"male","% Vizualizari":4.5},{"Grup Varsta":"age35-44","Gen":"female","% Vizualizari":3.8},{"Grup Varsta":"age25-34","Gen":"female","% Vizualizari":2.2},{"Grup Varsta":"age18-24","Gen":"male","% Vizualizari":0.6},{"Grup Varsta":"age18-24","Gen":"female","% Vizualizari":0.3},{"Grup Varsta":"age13-17","Gen":"male","% Vizualizari":0.2},{"Grup Varsta":"age13-17","Gen":"female","% Vizualizari":0.0}],
+  lf_stats: {"count":5,"avg_views":359.0,"avg_completion":22.15,"avg_watchtime":1044.0},
+  sh_stats: {"count":195,"avg_views":498.0,"avg_completion":58.79,"avg_watchtime":106.0},
+  daily_last30: [{"Data":"27 Feb","Views":49,"Watch Time (min)":17,"Likes":1},{"Data":"28 Feb","Views":48,"Watch Time (min)":50,"Likes":1},{"Data":"01 Mar","Views":91,"Watch Time (min)":32,"Likes":3},{"Data":"02 Mar","Views":38,"Watch Time (min)":10,"Likes":0},{"Data":"03 Mar","Views":73,"Watch Time (min)":18,"Likes":0},{"Data":"04 Mar","Views":166,"Watch Time (min)":102,"Likes":2},{"Data":"05 Mar","Views":36,"Watch Time (min)":6,"Likes":0},{"Data":"06 Mar","Views":40,"Watch Time (min)":12,"Likes":1},{"Data":"07 Mar","Views":57,"Watch Time (min)":13,"Likes":1},{"Data":"08 Mar","Views":76,"Watch Time (min)":115,"Likes":0},{"Data":"09 Mar","Views":71,"Watch Time (min)":19,"Likes":0},{"Data":"10 Mar","Views":45,"Watch Time (min)":12,"Likes":1},{"Data":"11 Mar","Views":53,"Watch Time (min)":10,"Likes":2},{"Data":"12 Mar","Views":73,"Watch Time (min)":25,"Likes":0},{"Data":"13 Mar","Views":59,"Watch Time (min)":17,"Likes":2},{"Data":"14 Mar","Views":69,"Watch Time (min)":10,"Likes":1},{"Data":"15 Mar","Views":73,"Watch Time (min)":18,"Likes":0},{"Data":"16 Mar","Views":96,"Watch Time (min)":32,"Likes":3},{"Data":"17 Mar","Views":68,"Watch Time (min)":38,"Likes":1},{"Data":"18 Mar","Views":60,"Watch Time (min)":13,"Likes":0},{"Data":"19 Mar","Views":77,"Watch Time (min)":16,"Likes":0},{"Data":"20 Mar","Views":78,"Watch Time (min)":15,"Likes":1},{"Data":"21 Mar","Views":58,"Watch Time (min)":12,"Likes":1},{"Data":"22 Mar","Views":57,"Watch Time (min)":28,"Likes":1},{"Data":"23 Mar","Views":57,"Watch Time (min)":13,"Likes":2},{"Data":"24 Mar","Views":242,"Watch Time (min)":112,"Likes":11},{"Data":"25 Mar","Views":2132,"Watch Time (min)":801,"Likes":79},{"Data":"26 Mar","Views":1106,"Watch Time (min)":490,"Likes":44},{"Data":"27 Mar","Views":976,"Watch Time (min)":310,"Likes":58},{"Data":"28 Mar","Views":0,"Watch Time (min)":0,"Likes":0}]
+};
+
+// ============ HELPERS ============
+function fNum(n){ return Math.round(n).toLocaleString('ro-RO'); }
+function fPct(n){ return n.toFixed(1)+'%'; }
+function delta(cur, prev){
+  if(!prev || prev===0) return '';
+  const pct = ((cur-prev)/prev)*100;
+  const sign = pct>=0 ? '+' : '';
+  const cls = pct>=0 ? 'delta-up' : 'delta-down';
+  return `<div class="metric-delta ${cls}">${sign}${Math.round(pct)}% față de luna anterioară</div>`;
+}
+function metricCard(label, value, sub, deltaHTML){
+  return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div>${sub?`<div class="metric-sub">${sub}</div>`:''}${deltaHTML||''}</div>`;
+}
+
+const monthLabels = {"2025-03":"Mar '25","2025-04":"Apr '25","2025-05":"Mai '25","2025-06":"Iun '25","2025-07":"Iul '25","2025-08":"Aug '25","2025-09":"Sep '25","2025-10":"Oct '25","2025-11":"Nov '25","2025-12":"Dec '25","2026-01":"Ian '26","2026-02":"Feb '26","2026-03":"Mar '26"};
+const trafficLabels = {"SHORTS":"Shorts","YT_SEARCH":"YouTube Search","YT_CHANNEL":"Canal YT","SUBSCRIBER":"Abonați","EXT_URL":"URL extern","RELATED_VIDEO":"Video similar","YT_OTHER_PAGE":"Altă pag. YT","HASHTAGS":"Hashtags","PLAYLIST":"Playlist","NO_LINK_OTHER":"Altele","NOTIFICATION":"Notificări","SOUND_PAGE":"Pagină sunet","SHORTS_CONTENT_LINKS":"Link Shorts","END_SCREEN":"Ecran final"};
+
+const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const gridC = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+const labelC = isDark ? '#7a7970' : '#9a9993';
+const tooltipBg = isDark ? '#252523' : '#ffffff';
+const tooltipBorder = isDark ? '#3a3a37' : '#e0ddd8';
+
+const COLORS = ['#378ADD','#1D9E75','#7F77DD','#EF9F27','#E24B4A','#D85A30','#9B59B6','#5DCAA5'];
+
+// ============ OVERVIEW ============
+document.getElementById('updated-date').textContent = D.totals.date_to;
+document.getElementById('overview-range').textContent = D.totals.date_from + ' → ' + D.totals.date_to + ' · ' + D.totals.days + ' zile';
+
+const wtHours = Math.round(D.totals.watchtime / 60);
+const yppPct = Math.min(100, (wtHours / 4000) * 100);
+document.getElementById('ypp-wt-fill').style.width = yppPct + '%';
+document.getElementById('ypp-wt-cur').textContent = fNum(wtHours) + ' ore (' + yppPct.toFixed(1) + '%)';
+
+document.getElementById('overview-metrics').innerHTML =
+  metricCard('Vizualizări totale', fNum(D.totals.views), D.totals.date_from + ' → ' + D.totals.date_to) +
+  metricCard('Watch time', fNum(wtHours) + ' ore', fNum(D.totals.watchtime) + ' minute') +
+  metricCard('Like-uri', fNum(D.totals.likes), 'Rată: ' + ((D.totals.likes/D.totals.views)*100).toFixed(2) + '%') +
+  metricCard('Share-uri', fNum(D.totals.shares), 'Comentarii: ' + fNum(D.totals.comments));
+
+new Chart(document.getElementById('monthlyChart'), {
+  type: 'bar',
+  data: {
+    labels: D.monthly.map(m => monthLabels[m.Month] || m.Month),
+    datasets: [{
+      data: D.monthly.map(m => m.Views),
+      backgroundColor: D.monthly.map(m => m.Views > 5000 ? '#378ADD' : m.Views > 1500 ? '#85B7EB' : '#B4B2A9'),
+      borderRadius: 5, borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false}, tooltip:{ backgroundColor:tooltipBg, borderColor:tooltipBorder, borderWidth:1, titleColor:isDark?'#f0ede8':'#1a1a18', bodyColor:isDark?'#b4b2a9':'#5f5e5a', callbacks:{ label: ctx => ' ' + fNum(ctx.parsed.y) + ' vizualizări' } } },
+    scales:{
+      x:{ grid:{display:false}, ticks:{color:labelC, font:{size:11}} },
+      y:{ grid:{color:gridC}, ticks:{color:labelC, font:{size:11}, callback: v => v>=1000?(v/1000).toFixed(0)+'k':v } }
+    }
+  }
+});
+
+// ============ LAST 30 ============
+document.getElementById('last30-range').textContent = D.last30.date_from + ' → ' + D.last30.date_to;
+document.getElementById('last30-metrics').innerHTML =
+  metricCard('Vizualizări', fNum(D.last30.views), null, delta(D.last30.views, D.prev30.views)) +
+  metricCard('Watch time', fNum(Math.round(D.last30.watchtime/60)) + ' ore', fNum(D.last30.watchtime) + ' minute', delta(D.last30.watchtime, D.prev30.watchtime)) +
+  metricCard('Like-uri', fNum(D.last30.likes), null, delta(D.last30.likes, D.prev30.likes));
+
+const d30labels = D.daily_last30.map(d => d.Data);
+const d30views = D.daily_last30.map(d => d.Views);
+new Chart(document.getElementById('last30Chart'), {
+  type: 'line',
+  data: {
+    labels: d30labels,
+    datasets: [{
+      data: d30views,
+      borderColor: '#378ADD',
+      backgroundColor: isDark ? 'rgba(55,138,221,0.12)' : 'rgba(55,138,221,0.08)',
+      borderWidth: 2, pointRadius: d30views.map(v => v > 500 ? 5 : 2),
+      pointBackgroundColor: d30views.map(v => v > 500 ? '#E24B4A' : '#378ADD'),
+      fill: true, tension: 0.3
+    }]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false}, tooltip:{ backgroundColor:tooltipBg, borderColor:tooltipBorder, borderWidth:1, titleColor:isDark?'#f0ede8':'#1a1a18', bodyColor:isDark?'#b4b2a9':'#5f5e5a', callbacks:{ label: ctx => ' ' + fNum(ctx.parsed.y) + ' vizualizări' } } },
+    scales:{
+      x:{ grid:{display:false}, ticks:{color:labelC, font:{size:10}, autoSkip:true, maxTicksLimit:15} },
+      y:{ grid:{color:gridC}, ticks:{color:labelC, font:{size:11}} }
+    }
+  }
+});
+
+// ============ VIDEOS ============
+document.getElementById('sh-count').textContent = D.sh_stats.count;
+document.getElementById('lf-count').textContent = D.lf_stats.count;
+document.getElementById('sh-metrics').innerHTML =
+  metricCard('Medie vizualizări', fNum(D.sh_stats.avg_views)) +
+  metricCard('Completion mediu', fPct(D.sh_stats.avg_completion)) +
+  metricCard('Watch time mediu', fNum(D.sh_stats.avg_watchtime) + ' min') +
+  metricCard('Total vizualizări', fNum(D.sh_stats.count * D.sh_stats.avg_views));
+document.getElementById('lf-metrics').innerHTML =
+  metricCard('Medie vizualizări', fNum(D.lf_stats.avg_views)) +
+  metricCard('Completion mediu', fPct(D.lf_stats.avg_completion)) +
+  metricCard('Watch time mediu', fNum(D.lf_stats.avg_watchtime) + ' min') +
+  metricCard('Total watch time', fNum(D.lf_stats.count * D.lf_stats.avg_watchtime) + ' min');
+
+const persColors = ['#5DCAA5','#85B7EB','#EF9F27','#7F77DD','#378ADD','#ED93B1','#97C459','#D3D1C7'];
+new Chart(document.getElementById('personalityChart'), {
+  type: 'bar', indexAxis: 'y',
+  data: {
+    labels: D.personalities.map(p => p.name),
+    datasets: [{ data: D.personalities.map(p => p.views), backgroundColor: persColors, borderRadius: 5, borderSkipped: false }]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false}, tooltip:{ backgroundColor:tooltipBg, borderColor:tooltipBorder, borderWidth:1, titleColor:isDark?'#f0ede8':'#1a1a18', bodyColor:isDark?'#b4b2a9':'#5f5e5a', callbacks:{ label: ctx => ' ' + fNum(ctx.parsed.x) + ' vizualizări' } } },
+    scales:{
+      x:{ grid:{color:gridC}, ticks:{color:labelC, font:{size:11}, callback: v => v>=1000?(v/1000).toFixed(0)+'k':v} },
+      y:{ grid:{display:false}, ticks:{color:isDark?'#f0ede8':'#1a1a18', font:{size:12}} }
+    }
+  }
+});
+
+const maxComp = Math.max(...D.top_completion.map(t => t['Avg % Viewed']));
+document.getElementById('completion-list').innerHTML = D.top_completion.map(t => {
+  const pct = Math.min(100, (t['Avg % Viewed'] / maxComp) * 100);
+  const val = t['Avg % Viewed'];
+  const col = val >= 90 ? '#1D9E75' : val >= 70 ? '#378ADD' : '#7F77DD';
+  return `<div class="progress-row">
+    <div class="progress-name" title="${t.Title}">${t.Title}</div>
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${col};"></div></div>
+    <div class="progress-val">${val.toFixed(1)}%</div>
+  </div>`;
+}).join('');
+
+document.getElementById('top-videos-body').innerHTML = D.top_videos.map((v,i) =>
+  `<tr>
+    <td style="color:var(--text3);font-size:11px;">${i+1}</td>
+    <td style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${v.Title}">${v.Title}</td>
+    <td><span class="badge ${v.Type==='Short'?'badge-short':'badge-long'}">${v.Type}</span></td>
+    <td class="td-right">${fNum(v.Views)}</td>
+    <td class="td-right">${fPct(v['Avg % Viewed'])}</td>
+    <td class="td-right">${fNum(v['Watch Time (min)'])} min</td>
+    <td class="td-right">${v.Likes}</td>
+  </tr>`
+).join('');
+
+// ============ AUDIENCE ============
+const ageGroups = ['13-17','18-24','25-34','35-44','45-54','55-64','65+'];
+const ageKeys = {'age13-17':'13-17','age18-24':'18-24','age25-34':'25-34','age35-44':'35-44','age45-54':'45-54','age55-64':'55-64','age65-':'65+'};
+const femaleData = ageGroups.map(ag => {
+  const key = Object.entries(ageKeys).find(([k,v])=>v===ag)?.[0];
+  const row = D.audience.find(a=>a['Grup Varsta']===key && a.Gen==='female');
+  return row ? row['% Vizualizari'] : 0;
+});
+const maleData = ageGroups.map(ag => {
+  const key = Object.entries(ageKeys).find(([k,v])=>v===ag)?.[0];
+  const row = D.audience.find(a=>a['Grup Varsta']===key && a.Gen==='male');
+  return row ? row['% Vizualizari'] : 0;
+});
+
+new Chart(document.getElementById('audienceChart'), {
+  type: 'bar',
+  data: {
+    labels: ageGroups,
+    datasets: [
+      { label: 'Feminin', data: femaleData, backgroundColor: '#ED93B1', borderRadius: 3, stack: 'a' },
+      { label: 'Masculin', data: maleData, backgroundColor: '#378ADD', borderRadius: 3, stack: 'a' }
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:true, position:'top', labels:{color:isDark?'#b4b2a9':'#5f5e5a', font:{size:11}, boxWidth:12, boxHeight:8} }, tooltip:{ backgroundColor:tooltipBg, borderColor:tooltipBorder, borderWidth:1 } },
+    scales:{
+      x:{ grid:{display:false}, ticks:{color:labelC}, stacked:true },
+      y:{ grid:{color:gridC}, ticks:{color:labelC, callback: v=>v+'%'}, stacked:true }
+    }
+  }
+});
+
+const ageTotals = ageGroups.map(ag => {
+  const key = Object.entries(ageKeys).find(([k,v])=>v===ag)?.[0];
+  const rows = D.audience.filter(a=>a['Grup Varsta']===key);
+  return rows.reduce((s,r)=>s+r['% Vizualizari'],0);
+});
+const ageColors = ageTotals.map(v => v > 25 ? '#E24B4A' : v > 15 ? '#EF9F27' : v > 8 ? '#378ADD' : '#B4B2A9');
+new Chart(document.getElementById('ageChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ageGroups,
+    datasets: [{ data: ageTotals, backgroundColor: ageColors, borderWidth: 0 }]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:true, position:'right', labels:{color:isDark?'#b4b2a9':'#5f5e5a', font:{size:11}, boxWidth:12, boxHeight:8, generateLabels: chart => {
+      const data = chart.data;
+      return data.labels.map((label,i) => ({
+        text: label + ' ' + ageTotals[i].toFixed(1) + '%',
+        fillStyle: data.datasets[0].backgroundColor[i],
+        strokeStyle: 'transparent',
+        lineWidth: 0, index: i, hidden: false
+      }));
+    }}}, tooltip:{ backgroundColor:tooltipBg, borderColor:tooltipBorder, borderWidth:1, callbacks:{ label: ctx => ' ' + ctx.parsed.toFixed(1) + '%' } } },
+    cutout: '55%'
+  }
+});
+
+// ============ TRAFFIC ============
+const totalTrafficViews = D.traffic.reduce((s,t)=>s+t.Views,0);
+const topTraffic = D.traffic.slice(0,6);
+const trafficColors = ['#378ADD','#1D9E75','#7F77DD','#EF9F27','#E24B4A','#B4B2A9'];
+
+document.getElementById('traffic-legend').innerHTML = topTraffic.map((t,i) =>
+  `<div class="legend-item"><div class="legend-dot" style="background:${trafficColors[i]};"></div>${trafficLabels[t['Sursa Trafic']]||t['Sursa Trafic']} ${((t.Views/totalTrafficViews)*100).toFixed(0)}%</div>`
+).join('');
+
+new Chart(document.getElementById('trafficChart'), {
+  type: 'doughnut',
+  data: {
+    labels: D.traffic.map(t => trafficLabels[t['Sursa Trafic']]||t['Sursa Trafic']),
+    datasets: [{
+      data: D.traffic.map(t=>t.Views),
+      backgroundColor: [...trafficColors, ...Array(20).fill('#D3D1C7')],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false}, tooltip:{ backgroundColor:tooltipBg, borderColor:tooltipBorder, borderWidth:1, callbacks:{ label: ctx => ' ' + fNum(ctx.parsed) + ' vizualizări (' + ((ctx.parsed/totalTrafficViews)*100).toFixed(1) + '%)' } } },
+    cutout: '58%'
+  }
+});
+
+const maxTraf = D.traffic[0].Views;
+document.getElementById('traffic-bars').innerHTML = D.traffic.map((t,i) => {
+  const pct = (t.Views / maxTraf) * 100;
+  const col = trafficColors[i] || '#B4B2A9';
+  return `<div class="progress-row">
+    <div class="progress-name" title="${trafficLabels[t['Sursa Trafic']]||t['Sursa Trafic']}">${trafficLabels[t['Sursa Trafic']]||t['Sursa Trafic']}</div>
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${col};"></div></div>
+    <div class="progress-val">${fNum(t.Views)}</div>
+  </div>`;
+}).join('');
+
+// ============ NAV ============
+function showSection(name){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('section-'+name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>
